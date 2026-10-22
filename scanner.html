@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#060D24">
+<title>SURKUS · Scanner IMEI</title>
+<style>
+:root{--gg:linear-gradient(135deg,#F0DFB0 0%,#CDAA5E 55%,#A8843A 100%);--gold:#EAD8A6;--bg:#060D24;--card:#0C1B4D}
+*{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif}
+html,body{background:radial-gradient(800px 500px at 50% -10%,#16358C 0,#0C1B4D 40%,#060D24 100%) fixed;color:#fff;min-height:100vh;min-height:100dvh}
+.wrap{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px))}
+h1{font-size:18px;color:var(--gold);letter-spacing:.3px}
+.top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.top small{margin-left:auto;background:rgba(234,216,166,.12);border:1px solid rgba(201,165,92,.5);color:var(--gold);padding:4px 11px;border-radius:20px;font-size:11px;font-weight:700}
+.view{position:relative;border-radius:22px;overflow:hidden;background:#000;border:1px solid rgba(201,165,92,.55);aspect-ratio:4/3;box-shadow:0 24px 50px -24px #000}
+.view video,.view #reader{width:100%;height:100%;object-fit:cover;display:block}
+.view #reader{display:none}.view #reader video{width:100%!important;height:100%!important;object-fit:cover}
+.frame{position:absolute;left:7%;right:7%;top:26%;bottom:26%;border:2px solid rgba(240,223,176,.9);border-radius:14px;pointer-events:none;box-shadow:0 0 0 999px rgba(0,0,0,.38)}
+.frame:after{content:"";position:absolute;left:6px;right:6px;top:50%;height:2px;background:linear-gradient(90deg,transparent,#F0DFB0,transparent);animation:sc 1.8s ease-in-out infinite}
+@keyframes sc{0%,100%{transform:translateY(-34px);opacity:.3}50%{transform:translateY(34px);opacity:1}}
+.view.off .frame{display:none}
+.msg{margin:12px 2px;font-size:13px;line-height:1.5;color:#C9D6F3;min-height:20px}
+.msg.err{color:#FFB4BA}.msg.ok{color:#8BE0B0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+button,.btn{border:1px solid rgba(201,165,92,.6);background:linear-gradient(135deg,#16358C,#0C1B4D);color:var(--gold);padding:12px 16px;border-radius:14px;font-weight:700;font-size:14px;cursor:pointer;flex:1;min-width:120px;text-align:center}
+button.g{background:var(--gg);color:#060D24;border-color:#F0DFB0}
+button:active{transform:scale(.97)}button[hidden]{display:none}
+.card{background:rgba(255,255,255,.05);border:1px solid rgba(201,165,92,.35);border-radius:18px;padding:14px;margin-top:12px}
+.card label{font-size:12px;color:#C9D6F3;font-weight:600}
+.manual{display:flex;gap:8px;margin-top:6px}
+.manual input{flex:1;min-width:0;padding:12px;border-radius:12px;border:1px solid rgba(201,165,92,.45);background:#060D24;color:#fff;font-size:16px;letter-spacing:1px}
+.manual button{flex:none;min-width:0}
+#res{display:none;text-align:center}
+#res .im{font-size:26px;font-weight:800;letter-spacing:2px;color:#F0DFB0;margin:8px 0 6px;word-break:break-all;font-variant-numeric:tabular-nums}
+#res .ck{font-size:12.5px;margin-bottom:6px}
+.help{font-size:11.5px;color:#9FB0D8;line-height:1.6;margin-top:14px}
+@media(prefers-reduced-motion:reduce){.frame:after{animation:none}}
+</style></head><body>
+<div class="wrap">
+ <div class="top"><h1>Scanner IMEI</h1><small id="slot">IMEI 1</small></div>
+ <div class="view" id="view"><video id="v" playsinline muted autoplay></video><div id="reader"></div><div class="frame"></div></div>
+ <div class="msg" id="msg">Menyalakan kamera…</div>
+ <div class="row"><button id="tor" hidden>🔦 Senter</button><label class="btn" style="margin:0">📷 Foto label<input id="file" type="file" accept="image/*" capture="environment" hidden></label></div>
+ <div class="card" id="res"><label>IMEI terbaca</label><div class="im" id="imv"></div><div class="ck" id="ckv"></div>
+  <div class="row"><button class="g" id="send">Kirim ke Aplikasi</button><button id="copy">Salin</button><button id="again">Scan Ulang</button></div></div>
+ <div class="card"><label>Atau ketik manual (15 digit)</label><div class="manual"><input id="man" inputmode="numeric" maxlength="20" placeholder="350000000000000"><button class="g" id="useman">Pakai</button></div></div>
+ <p class="help">Arahkan kamera ke barcode IMEI pada kotak/label HP atau layar (*#06#). Pastikan cahaya cukup dan barcode berada di dalam bingkai. Jika kamera tidak mau menyala, izinkan akses kamera untuk situs ini di pengaturan browser.</p>
+</div>
+<script>
+(function(){
+'use strict';
+var q=new URLSearchParams(location.search),SLOT=q.get('slot')==='2'?2:1,NONCE=String(q.get('n')||'').slice(0,64),EMBED=q.get('embed')==='1';
+var $=function(i){return document.getElementById(i)},cur='',stream=null,det=null,h5=null,timer=0,mode='',busy=false,torchOn=false;
+$('slot').textContent='IMEI '+SLOT;
+function say(t,c){var m=$('msg');m.textContent=t;m.className='msg'+(c?' '+c:'')}
+function luhn(s){if(!/^\d{15}$/.test(s))return false;var sum=0;for(var i=0;i<15;i++){var d=+s[14-i];if(i%2===1){d*=2;if(d>9)d-=9}sum+=d}return sum%10===0}
+function extract(t){var out=[],s=String(t||'');[s,s.replace(/[\s\-.\/]/g,'')].forEach(function(x){var re=/(?:^|\D)(\d{15})(?!\d)/g,m;while((m=re.exec(x))){if(out.indexOf(m[1])<0)out.push(m[1])}});return out}
+function pick(list){for(var i=0;i<list.length;i++)if(luhn(list[i]))return list[i];return list[0]||''}
+function stop(){clearTimeout(timer);timer=0;try{if(stream){stream.getTracks().forEach(function(t){t.stop()});stream=null}}catch(e){}try{if(h5&&h5.isScanning)h5.stop().catch(function(){})}catch(e){}$('view').classList.add('off');$('tor').hidden=true}
+function found(imei){
+ cur=imei;stop();
+ try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}
+ $('imv').textContent=imei.replace(/(\d{2})(\d{6})(\d{6})(\d)/,'$1 $2 $3 $4');
+ var ok=luhn(imei),ck=$('ckv');ck.textContent=ok?'✔ Checksum IMEI valid':'⚠ Checksum IMEI tidak valid — kemungkinan salah baca. Scan ulang atau tetap kirim bila yakin.';ck.style.color=ok?'#8BE0B0':'#FFD08A';
+ $('res').style.display='block';say(ok?'IMEI berhasil dibaca.':'IMEI terbaca, tetapi perlu diperiksa.',ok?'ok':'');if(EMBED&&ok)setTimeout(function(){$('send').click()},350);
+}
+function handle(text){var l=extract(text);if(!l.length){say('Terbaca "'+String(text).slice(0,24)+'" — bukan IMEI 15 digit. Arahkan ke barcode IMEI.');return false}found(pick(l));return true}
+function loadLib(){return new Promise(function(ok,no){if(window.Html5Qrcode)return ok();var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js';s.onload=ok;s.onerror=function(){no(new Error('Pustaka scanner gagal dimuat. Periksa koneksi internet.'))};document.head.appendChild(s)})}
+var WANT=['code_128','code_39','code_93','codabar','ean_13','ean_8','itf','upc_a','upc_e','qr_code','data_matrix','pdf417'];
+function errText(e){var n=e&&e.name||'';if(n==='NotAllowedError'||n==='SecurityError'||/permission|denied/i.test(String(e&&e.message||e)))return 'Akses kamera ditolak. Izinkan kamera untuk situs ini di pengaturan browser, lalu muat ulang halaman. Anda tetap bisa memakai "Foto label" atau ketik manual.';if(n==='NotFoundError')return 'Kamera tidak ditemukan di perangkat ini. Gunakan "Foto label" atau ketik manual.';return 'Kamera gagal dinyalakan: '+String(e&&e.message||e)+'. Gunakan "Foto label" atau ketik manual.'}
+async function start(){
+ $('res').style.display='none';cur='';$('view').classList.remove('off');say('Menyalakan kamera…');
+ if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){say('Kamera memerlukan HTTPS. Buka halaman ini lewat alamat https:// (GitHub Pages).','err');return}
+ try{
+  var native=false,fm=[];
+  if('BarcodeDetector' in window){try{var sup=await BarcodeDetector.getSupportedFormats();fm=WANT.filter(function(f){return sup.indexOf(f)>=0});native=fm.indexOf('code_128')>=0}catch(e){}}
+  if(native){
+   mode='native';$('v').style.display='block';$('reader').style.display='none';
+   stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+   $('v').srcObject=stream;await $('v').play();det=new BarcodeDetector({formats:fm});
+   try{var tr=stream.getVideoTracks()[0],cp=tr.getCapabilities&&tr.getCapabilities();if(cp&&cp.torch)$('tor').hidden=false;if(cp&&cp.focusMode&&cp.focusMode.indexOf('continuous')>=0)tr.applyConstraints({advanced:[{focusMode:'continuous'}]}).catch(function(){})}catch(e){}
+   say('Arahkan kamera ke barcode IMEI.');
+   (function loop(){if(!stream)return;timer=setTimeout(function(){if($('v').readyState>=2&&!busy){busy=true;det.detect($('v')).then(function(c){busy=false;for(var i=0;i<c.length;i++){if(handle(c[i].rawValue))return}loop()}).catch(function(){busy=false;loop()})}else loop()},140)})();
+  }else{
+   mode='lib';await loadLib();$('v').style.display='none';$('reader').style.display='block';
+   var F=Html5QrcodeSupportedFormats;h5=new Html5Qrcode('reader',{formatsToSupport:[F.CODE_128,F.CODE_39,F.CODE_93,F.CODABAR,F.EAN_13,F.EAN_8,F.ITF,F.UPC_A,F.UPC_E,F.QR_CODE,F.DATA_MATRIX],verbose:false,useBarCodeDetectorIfSupported:true});
+   await h5.start({facingMode:'environment'},{fps:10,qrbox:function(w,h){return{width:Math.floor(w*.88),height:Math.floor(h*.4)}}},function(t){handle(t)},function(){});
+   say('Arahkan kamera ke barcode IMEI.');
+  }
+ }catch(e){say(errText(e),'err');$('view').classList.add('off')}
+}
+$('tor').onclick=function(){try{torchOn=!torchOn;stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:torchOn}]})}catch(e){say('Senter tidak didukung.','err')}};
+$('again').onclick=function(){start()};
+$('copy').onclick=function(){try{navigator.clipboard.writeText(cur).then(function(){say('IMEI disalin.','ok')},function(){say('Tidak bisa menyalin otomatis.','err')})}catch(e){say('Tidak bisa menyalin otomatis.','err')}};
+$('send').onclick=function(){
+ if(!cur)return;var sent=false;
+ try{var tg=(window.opener&&!window.opener.closed)?window.opener:((window.parent&&window.parent!==window)?window.parent:null);if(tg){tg.postMessage({type:'surkus-imei',imei:cur,slot:SLOT,n:NONCE},'*');sent=true}}catch(e){}
+ try{navigator.clipboard.writeText(cur)}catch(e){}
+ if(sent){say('Terkirim ke aplikasi ✔. Tab ini akan ditutup; jika tidak, tutup manual lalu kembali ke aplikasi.','ok');setTimeout(function(){if(!EMBED){try{window.close()}catch(e){}}},700)}
+ else say('Tab aplikasi tidak terhubung. IMEI sudah disalin — kembali ke aplikasi, ketuk kolom IMEI, lalu tempel.','err');
+};
+$('useman').onclick=function(){var v=$('man').value.replace(/\D/g,'');if(!/^\d{15}$/.test(v)){say('IMEI harus 15 digit angka.','err');return}found(v)};
+$('file').onchange=async function(){
+ var f=this.files&&this.files[0];this.value='';if(!f)return;say('Membaca foto…');
+ try{
+  var txt='';
+  if('BarcodeDetector' in window){var d=det||new BarcodeDetector();var bm=await createImageBitmap(f),c=await d.detect(bm);for(var i=0;i<c.length&&!txt;i++){if(extract(c[i].rawValue).length)txt=c[i].rawValue}}
+  if(!txt){await loadLib();var box=document.getElementById('hid')||document.body.appendChild(Object.assign(document.createElement('div'),{id:'hid',style:'display:none'}));txt=await new Html5Qrcode('hid',{verbose:false}).scanFile(f,false)}
+  if(!handle(txt))say('Barcode pada foto bukan IMEI 15 digit.','err')
+ }catch(e){say('Barcode tidak terbaca pada foto. Coba foto lebih dekat dan tajam, atau ketik manual.','err')}
+};
+document.addEventListener('visibilitychange',function(){if(document.hidden)stop();else if(!cur)start()});
+window.addEventListener('pagehide',stop);
+start();
+})();
+</script></body></html>
