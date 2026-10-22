@@ -40,7 +40,7 @@ async function start(){
   await loadLib();
   var F=Html5QrcodeSupportedFormats;
   h5=new Html5Qrcode('reader',{formatsToSupport:[F.CODE_128,F.CODE_39,F.CODE_93,F.CODABAR,F.ITF,F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.QR_CODE,F.DATA_MATRIX,F.PDF_417],verbose:false,useBarCodeDetectorIfSupported:false});
-  await h5.start({facingMode:{ideal:'environment'}},{fps:20,qrbox:function(w,h){return {width:Math.max(220,Math.floor(w*.98)),height:Math.max(110,Math.floor(h*.72))}},aspectRatio:1.333,disableFlip:true},function(t){if(!handle(t)){say('Barcode terdeteksi, tetapi angka IMEI tidak cocok. Coba posisikan barcode lebih tegak.')}},function(){});
+  await h5.start({facingMode:'environment'},{fps:20,qrbox:function(w,h){return {width:Math.max(220,Math.floor(w*.98)),height:Math.max(110,Math.floor(h*.72))}},aspectRatio:1.333,disableFlip:true},function(t){if(!handle(t)){say('Barcode terdeteksi, tetapi angka IMEI tidak cocok. Coba posisikan barcode lebih tegak.')}},function(){});
   try{var track=h5.getRunningTrackCapabilities&&h5.getRunningTrackCapabilities();if(track&&track.torch)$('tor').hidden=false}catch(e){}
   say('Pemindai aktif. Penuhi bingkai dengan barcode garis-garis.');
  }catch(e){stop();say(errText(e),'err')}
